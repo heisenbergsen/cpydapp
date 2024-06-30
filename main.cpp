@@ -544,7 +544,7 @@ int main(int argc, char* argv[]) {
         agrupar++;
 
         if (agrupar == 10) {
-            std::cout << "Bloques leídos hasta ahora: " << cantidadBloques << std::endl;
+            //std::cout << "Bloques leídos hasta ahora: " << cantidadBloques << std::endl;
             agrupar = 0; // Reiniciar el contador
             //if(cantidadBloques>500){imprimirMapa(productos);}
         }
@@ -571,7 +571,7 @@ int main(int argc, char* argv[]) {
             if (sheet) {
                 // Obtener el nombre de la hoja (opcional)
                 const char* sheetName = sheet->name();
-                std::cout << "Leyendo la hoja: " << (sheetName ? sheetName : "Sin nombre") << std::endl;
+                //std::cout << "Leyendo la hoja: " << (sheetName ? sheetName : "Sin nombre") << std::endl;
 
                 // ... [El resto del código para procesar la hoja]
                 for (double value : AñosCanastas) {
@@ -580,7 +580,6 @@ int main(int argc, char* argv[]) {
                     }
                     for (const auto& canasta : misCanastas) {
                         if (value == std::stoi(canasta.anio)) {
-                            std::cout << "xd1 " << std::endl;
                             // Cargar precios a un vector
                             PreciosCanasta.clear();
                             for (int i = 0; i < 12; ++i) {
@@ -604,7 +603,7 @@ int main(int argc, char* argv[]) {
                             }
                             
                             for(int i = 0; i <= 11; ++i){
-                                paridadAño[i]=paridadAño[i]/diasMes[i];
+                                //paridadAño[i]=paridadAño[i]/diasMes[i];
                             }
                                                         // Imprimir resultados
                             std::cout << "Precios Canasta: ";
