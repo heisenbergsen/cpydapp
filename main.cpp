@@ -222,10 +222,8 @@ void leerCSV(const std::string& nombre_archivo, Cola& cola, int tamano_bloque, s
     std::ifstream archivo(nombre_archivo);
     std::string linea;
     Bloque bloque_actual;
-
     if (archivo.is_open()) {
-        archivo.seekg(posicion_actual); // Mover la posición del archivo a la posición actual guardada
-
+        archivo.seekg(posicion_actual);
         while (std::getline(archivo, linea) && bloque_actual.lineas.size() < tamano_bloque) {
             if (std::count(linea.begin(), linea.end(), '"') % 2 != 0) {
                 std::string linea_siguiente;
@@ -233,16 +231,15 @@ void leerCSV(const std::string& nombre_archivo, Cola& cola, int tamano_bloque, s
                     linea += linea_siguiente;
                 }
             }
-
             bloque_actual.lineas.push_back(linea);
         }
-
         if (!bloque_actual.lineas.empty()) {
-            cola.push(bloque_actual);
+            #pragma omp critical(acceso_cola)
+            {
+                cola.push(bloque_actual);
+            }
         }
-
-        posicion_actual = archivo.tellg(); // Actualizar la posición actual del archivo
-
+        posicion_actual = archivo.tellg();
         archivo.close();
     } else {
         std::cerr << "No se pudo abrir el archivo" << std::endl;
@@ -261,113 +258,115 @@ void descartarPrimeraLinea(const std::string& nombre_archivo, std::streampos& po
         std::cerr << "No se pudo abrir el archivo" << std::endl;
     }
 }
-// Función para procesar un bloque de datos
 void procesarBloque(const Bloque& bloque, MapaProductos& productos, MapaProductos& canasta) {
-    for (const auto& linea : bloque.lineas) {
+    #pragma omp parallel for
+    for (int i = 0; i < bloque.lineas.size(); ++i) {
+        const auto& linea = bloque.lineas[i];
         std::vector<std::string> campos = procesarLinea(linea);
         RegistroCompra registro;
         try {
             registro = procesarRegistro(campos);
         } catch (const std::runtime_error& e) {
-            std::cerr << "Error al procesar registro: " << e.what() << std::endl;
-            continue; // Salta este registro y pasa al siguiente
+            #pragma omp critical(error_output)
+            {
+                std::cerr << "Error al procesar registro: " << e.what() << std::endl;
+            }
+            continue;
         }
-        // Organización por año
-        int anio = registro.fecha.anio;
 
-        // Crear la clave para el producto (considerando colisiones)
+        int anio = registro.fecha.anio;
         std::string key = registro.identificadorProducto;
 
-        // Buscar el producto en el vector correspondiente al año
-        bool encontrado = false;
-        for (auto& producto : productos[key]) {
-            if (producto.id == registro.identificadorProducto) {
-                // Producto encontrado, buscar el nombre correspondiente
-                for (size_t i = 0; i < producto.nombres.size(); ++i) {
-                    if (producto.nombres[i] == registro.nombre) {
-                        // Nombre encontrado, buscar el año correspondiente
-                        for (auto& ventaAnio : producto.ventasAnuales) {
-                            if (ventaAnio.year == anio) {
-                                // Año encontrado, actualizar ventas mensuales
-                                int mes = registro.fecha.mes - 1; // Meses de 0 a 11 en el arreglo
-                                ventaAnio.ventasEnAnio[mes].ventasEnMes = true;
-                                ventaAnio.ventasEnAnio[mes].sumatoriaMontos += registro.monto;
-                                ventaAnio.ventasEnAnio[mes].sumatoriaCantidades += registro.cantidad;
-                                ///////////////inyeccion de verificacion
-                                bool todosLosMesesConVentas = true;
-                                for (int mes = 0; mes < 11; ++mes) {
-                                    if (!ventaAnio.ventasEnAnio[mes].ventasEnMes) {
-                                        todosLosMesesConVentas = false; // Si encontramos un mes sin ventas, retornamos false
-                                    }
-                                }
-                                if (todosLosMesesConVentas == true) {
-                                    // Copiar el producto al mapa canasta
-                                    std::string key = registro.identificadorProducto;
+        #pragma omp critical(acceso_productos)
+        {
+            bool encontrado = false;
+            for (auto& producto : productos[key]) {
+                if (producto.id == registro.identificadorProducto) {
+                    // Producto encontrado, buscar el nombre correspondiente
+                    for (size_t j = 0; j < producto.nombres.size(); ++j) {
+                        if (producto.nombres[j] == registro.nombre) {
+                            // Nombre encontrado, buscar el año correspondiente
+                            for (auto& ventaAnio : producto.ventasAnuales) {
+                                if (ventaAnio.year == anio) {
+                                    // Año encontrado, actualizar ventas mensuales
+                                    int mes = registro.fecha.mes - 1;
+                                    ventaAnio.ventasEnAnio[mes].ventasEnMes = true;
+                                    ventaAnio.ventasEnAnio[mes].sumatoriaMontos += registro.monto;
+                                    ventaAnio.ventasEnAnio[mes].sumatoriaCantidades += registro.cantidad;
                                     
-                                    // Buscar el producto en el mapa de origen (productos)
-                                    auto it = std::find_if(productos[key].begin(), productos[key].end(),
-                                        [&registro](const ProductoMapa& p) { return p.id == registro.identificadorProducto; });
-                                    
-                                    if (it != productos[key].end()) {
-                                        // Producto encontrado, crear una copia
-                                        ProductoMapa productoCopiado = *it;
-                                        
-                                        // Buscar si ya existe en el mapa de destino (canasta)
-                                        auto it_canasta = std::find_if(canasta[key].begin(), canasta[key].end(),
-                                            [&registro](const ProductoMapa& p) { return p.id == registro.identificadorProducto; });
-                                        
-                                        if (it_canasta != canasta[key].end()) {
-                                            // Si ya existe, actualizarlo
-                                            *it_canasta = productoCopiado;
-                                        } else {
-                                            // Si no existe, agregarlo
-                                            canasta[key].push_back(productoCopiado);
+                                    // Verificación de todos los meses con ventas
+                                    bool todosLosMesesConVentas = true;
+                                    for (int m = 0; m < 12; ++m) {
+                                        if (!ventaAnio.ventasEnAnio[m].ventasEnMes) {
+                                            todosLosMesesConVentas = false;
+                                            break;
                                         }
                                     }
+                                    
+                                    if (todosLosMesesConVentas) {
+                                        #pragma omp critical(acceso_canasta)
+                                        {
+                                            // Copiar el producto al mapa canasta
+                                            auto it = std::find_if(productos[key].begin(), productos[key].end(),
+                                                [&registro](const ProductoMapa& p) { return p.id == registro.identificadorProducto; });
+                                            
+                                            if (it != productos[key].end()) {
+                                                ProductoMapa productoCopiado = *it;
+                                                auto it_canasta = std::find_if(canasta[key].begin(), canasta[key].end(),
+                                                    [&registro](const ProductoMapa& p) { return p.id == registro.identificadorProducto; });
+                                                
+                                                if (it_canasta != canasta[key].end()) {
+                                                    *it_canasta = productoCopiado;
+                                                } else {
+                                                    canasta[key].push_back(productoCopiado);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    encontrado = true;
+                                    break;
                                 }
-                                encontrado = true;
-                                break;
                             }
+                            if (!encontrado) {
+                                // Año no encontrado, agregar nuevo año de ventas
+                                VentaAnio nuevaVentaAnio(anio);
+                                int mes = registro.fecha.mes - 1;
+                                nuevaVentaAnio.ventasEnAnio[mes].ventasEnMes = true;
+                                nuevaVentaAnio.ventasEnAnio[mes].sumatoriaMontos += registro.monto;
+                                nuevaVentaAnio.ventasEnAnio[mes].sumatoriaCantidades += registro.cantidad;
+                                producto.ventasAnuales.push_back(nuevaVentaAnio);
+                                encontrado = true;
+                            }
+                            break;
                         }
-                        if (!encontrado) {
-                            // Año no encontrado, agregar nuevo año de ventas
-                            VentaAnio nuevaVentaAnio(anio);
-                            int mes = registro.fecha.mes - 1; // Meses de 0 a 11 en el arreglo
-                            nuevaVentaAnio.ventasEnAnio[mes].ventasEnMes = true;
-                            nuevaVentaAnio.ventasEnAnio[mes].sumatoriaMontos += registro.monto;
-                            nuevaVentaAnio.ventasEnAnio[mes].sumatoriaCantidades += registro.cantidad;
-                            producto.ventasAnuales.push_back(nuevaVentaAnio);
-                            encontrado = true;
-                        }
-                        break;
                     }
+                    if (!encontrado) {
+                        // Nombre no encontrado, agregar nuevo nombre y año de ventas
+                        producto.nombres.push_back(registro.nombre);
+                        VentaAnio nuevaVentaAnio(anio);
+                        int mes = registro.fecha.mes - 1;
+                        nuevaVentaAnio.ventasEnAnio[mes].ventasEnMes = true;
+                        nuevaVentaAnio.ventasEnAnio[mes].sumatoriaMontos += registro.monto;
+                        nuevaVentaAnio.ventasEnAnio[mes].sumatoriaCantidades += registro.cantidad;
+                        producto.ventasAnuales.push_back(nuevaVentaAnio);
+                        encontrado = true;
+                    }
+                    break;
                 }
-                if (!encontrado) {
-                    // Nombre no encontrado, agregar nuevo nombre y año de ventas
-                    producto.nombres.push_back(registro.nombre);
-                    VentaAnio nuevaVentaAnio(anio);
-                    int mes = registro.fecha.mes - 1; // Meses de 0 a 11 en el arreglo
-                    nuevaVentaAnio.ventasEnAnio[mes].ventasEnMes = true;
-                    nuevaVentaAnio.ventasEnAnio[mes].sumatoriaMontos += registro.monto;
-                    nuevaVentaAnio.ventasEnAnio[mes].sumatoriaCantidades += registro.cantidad;
-                    producto.ventasAnuales.push_back(nuevaVentaAnio);
-                    encontrado = true;
-                }
-                break;
             }
-        }
 
-        if (!encontrado) {
-            // Producto no encontrado, crear nuevo producto y añadir nombre y año de ventas
-            ProductoMapa nuevoProducto(registro.identificadorProducto);
-            nuevoProducto.nombres.push_back(registro.nombre);
-            VentaAnio nuevaVentaAnio(anio);
-            int mes = registro.fecha.mes - 1; // Meses de 0 a 11 en el arreglo
-            nuevaVentaAnio.ventasEnAnio[mes].ventasEnMes = true;
-            nuevaVentaAnio.ventasEnAnio[mes].sumatoriaMontos += registro.monto;
-            nuevaVentaAnio.ventasEnAnio[mes].sumatoriaCantidades += registro.cantidad;
-            nuevoProducto.ventasAnuales.push_back(nuevaVentaAnio);
-            productos[key].push_back(nuevoProducto);
+            if (!encontrado) {
+                // Producto no encontrado, crear nuevo producto y añadir nombre y año de ventas
+                ProductoMapa nuevoProducto(registro.identificadorProducto);
+                nuevoProducto.nombres.push_back(registro.nombre);
+                VentaAnio nuevaVentaAnio(anio);
+                int mes = registro.fecha.mes - 1;
+                nuevaVentaAnio.ventasEnAnio[mes].ventasEnMes = true;
+                nuevaVentaAnio.ventasEnAnio[mes].sumatoriaMontos += registro.monto;
+                nuevaVentaAnio.ventasEnAnio[mes].sumatoriaCantidades += registro.cantidad;
+                nuevoProducto.ventasAnuales.push_back(nuevaVentaAnio);
+                productos[key].push_back(nuevoProducto);
+            }
         }
     }
 }
@@ -581,7 +580,6 @@ int main(int argc, char* argv[]) {
     
     std::streampos posicion_actual = 0; // Variable para almacenar la posición actual en el archivo
     descartarPrimeraLinea("pd.csv", posicion_actual);
-
     while (quedanLineasPorLeer("pd.csv", posicion_actual)) {
         leerCSV("pd.csv", cola_bloques, TAMANO_BLOQUE, posicion_actual);
         cantidadBloques++;
