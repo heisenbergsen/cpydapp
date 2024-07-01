@@ -1,0 +1,46 @@
+####Requisitos de Instalación y Ejecución de la Aplicación####
+Instalar la librería libxl en el sistema.
+Utilizar el compilador GCC versión 13.2.0-23ubuntu4.
+Instalar OpenMP.
+Tener el archivo base_de_datos.csv en el directorio del ejecutable.
+Ejecutar el programa pasando como variable de sistema el archivo con la paridad de pesos peruanos a chilenos en formato Excel, ejemplo: ./programa Datos\ históricos\ PEN_CLP.xlsx
+
+
+## Pasos para Cumplir los Requisitos
+
+### 1. Instalar la librería libxl
+
+1. **Descargar e instalar la librería libxl desde el sitio web oficial:**
+   - [Descargar libxl](http://www.libxl.com/download/libxl-lin-4.0.3.tar.gz)
+
+
+### 2. Utilizar el compilador GCC versión 13.2.0-23ubuntu4
+
+1. **Actualizar los repositorios del sistema:**
+
+   ```bash
+   sudo apt update
+   ```
+
+2. **Instalar GCC versión 13.2.0-23ubuntu4:**
+
+   ```bash
+   sudo apt install gcc-13 g++-13
+   ```
+
+### 3. Instalar OpenMP
+
+1. **Instalar OpenMP, que debería estar incluido con GCC:**
+
+   ```bash
+   sudo apt install libomp-dev
+   ```
+
+### 4. Tener el archivo `base_de_datos.csv` en el directorio del ejecutable
+
+1. **Asegúrese de que el archivo `base_de_datos.csv` esté ubicado en el mismo directorio que su ejecutable.**
+
+### 5. Ejecutar el programa pasando el archivo de paridad como variable del sistema.
+
+
+

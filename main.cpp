@@ -514,6 +514,50 @@ void procesarMapaYCanastas(const MapaProductos& mapa, std::vector<Canasta>& cana
         }
     }
 }
+// Función para calcular y guardar la inflación en un archivo de texto
+void calcularYGuardarInflacion(const std::vector<double>& preciosPeru, const std::vector<double>& tipoCambioPEN_CLP) {
+    // Verificar que los vectores tengan la misma longitud (12 meses)
+    if (preciosPeru.size() != 12 || tipoCambioPEN_CLP.size() != 12) {
+        std::cout << "Error: Los vectores deben contener datos para los 12 meses del año." << std::endl;
+        return;
+    }
+
+    // Vector para almacenar la inflación mensual
+    std::vector<double> inflacion;
+
+    // Calcular la inflación mes a mes
+    for (int i = 1; i < 12; ++i) {
+        double precio_rel_actual = preciosPeru[i] / tipoCambioPEN_CLP[i];
+        double precio_rel_anterior = preciosPeru[i - 1] / tipoCambioPEN_CLP[i - 1];
+        
+        // Calcular la inflación mensual
+        double inflacion_mes = ((precio_rel_actual / precio_rel_anterior) - 1.0) * 100.0;
+        
+        // Almacenar la inflación calculada
+        inflacion.push_back(inflacion_mes);
+    }
+
+    // Abrir el archivo en modo de añadir (append)
+    std::ofstream archivo("inflacion.txt", std::ios::app);
+    if (archivo.is_open()) {
+        // Escribir los resultados en el archivo
+        archivo << "Inflación mensual entre Perú y Chile:" << std::endl;
+        archivo << "-----------------------------------" << std::endl;
+        archivo << "Mes\t| Inflación (%)" << std::endl;
+        archivo << "-----------------------------------" << std::endl;
+        for (int i = 1; i < 12; ++i) {
+            archivo << "Mes " << (i + 1) << ":\t| " << std::fixed << std::setprecision(2) << inflacion[i - 1] << std::endl;
+        }
+        archivo << "-----------------------------------" << std::endl << std::endl;
+
+        // Cerrar el archivo
+        archivo.close();
+        std::cout << "Inflación calculada y guardada en inflacion.txt." << std::endl;
+    } else {
+        std::cout << "Error al abrir el archivo inflacion.txt." << std::endl;
+    }
+}
+
 
 int main(int argc, char* argv[]) {
     MapaProductos productos;//mapa completo todos los registros
@@ -591,32 +635,54 @@ int main(int argc, char* argv[]) {
                             //paridadAño.clear();
                             double fechaeXl ;
                             double precioeXl;
-                            for (int row = 6; row <= 3733; ++row) {
+                            //std::cout<<  "año objetivo"<<yearObjetivo<<std::endl;
+                            int inicio=0;
+                            int fin = 0;
+                            if(yearObjetivo==2022){
+                            inicio = 3138;
+                            fin = 3338;
+                            }
+                            if(yearObjetivo==2023){
+                            inicio = 3338;
+                            fin = 3659;
+                            }
+                            for(int i = 0; i <= 11; ++i){
+                                diasMes[i]=0;
+                            }
+                            for (int row = inicio; row <= fin; row+=5) {
                                 //CellType cellType = sheet->cellType(row, col);
                                 int year, month, day;
                                 book->dateUnpack(sheet->readNum(row, 0), &year, &month, &day);
+                                //std::cout << day << std::endl;
+                                //std::cout<< month<< std::endl;
+                                //std::cout<<  year<<std::endl;
+                                
                                 if(year==yearObjetivo){
+                                    //std::cout << "igual año: ";
                                     precioeXl= sheet->readNum(row, 1);
+                                    //std::cout << "aaa"<< precioeXl << " aaa";
                                     paridadAño[month-1]+=precioeXl;
                                     diasMes[month-1]=diasMes[month-1]+1;
                                 }
                             }
                             
                             for(int i = 0; i <= 11; ++i){
-                                //paridadAño[i]=paridadAño[i]/diasMes[i];
+                                paridadAño[i]=paridadAño[i]/diasMes[i];
                             }
+                            calcularYGuardarInflacion(PreciosCanasta, paridadAño);
+
                                                         // Imprimir resultados
-                            std::cout << "Precios Canasta: ";
+                            //std::cout << "Precios Canasta: ";
                             for (auto price : PreciosCanasta) {
-                                std::cout << price << " ";
+                                //std::cout << price << " ";
                             }
-                            std::cout << std::endl;
+                            //std::cout << std::endl;
                             
-                            std::cout << "Paridad Año: ";
+                            //std::cout << "Paridad Año: ";
                             for (auto pari : paridadAño) {
-                                std::cout << pari << " ";
+                                //std::cout << pari << " ";
                             }
-                            std::cout << std::endl;
+                            //std::cout << std::endl;
                         }
                     }
                 }
