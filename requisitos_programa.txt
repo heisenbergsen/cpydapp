@@ -4,6 +4,7 @@ Utilizar el compilador GCC versión 13.2.0-23ubuntu4.
 Instalar OpenMP.
 Tener el archivo base_de_datos.csv en el directorio del ejecutable.
 Ejecutar el programa pasando como variable de sistema el archivo con la paridad de pesos peruanos a chilenos en formato Excel, ejemplo: ./programa Datos\ históricos\ PEN_CLP.xlsx
+no se requiere pasar como argumento nombre para los resultados, por defecto es resultados.txt
 
 
 ## Pasos para Cumplir los Requisitos
