@@ -640,10 +640,10 @@ int main(int argc, char* argv[]) {
                             int fin = 0;
                             if(yearObjetivo==2022){
                             inicio = 3138;
-                            fin = 3338;
+                            fin = 3400;
                             }
                             if(yearObjetivo==2023){
-                            inicio = 3338;
+                            inicio = 3399;
                             fin = 3659;
                             }
                             for(int i = 0; i <= 11; ++i){
